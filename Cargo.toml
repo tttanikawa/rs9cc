@@ -1,5 +1,5 @@
 [package]
-name = "chibicc-rs"
+name = "rs9cc"
 version = "0.1.0"
 authors = ["ukiyoyo <13175394+ukiyoyo@users.noreply.github.com>"]
 edition = "2018"
