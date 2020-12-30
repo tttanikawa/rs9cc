@@ -35,25 +35,40 @@ impl Tokenizer {
 
     fn tokenize(&mut self, input: String) {
         self.tokens.clear();
+        let mut char_count = 0usize;
         let mut remain = input.as_str();
         while let Some(next) = remain.chars().nth(0) {
             match next {
                 ' ' => {
-                    remain = remain.trim();
+                    let t = remain.trim_start();
+                    char_count += remain.len() - t.len();
+                    remain = t;
                 }
                 '+' | '-' => {
                     self.new_token(TokenKind::Reserved, next.to_string());
                     let (_, t) = remain.split_at(1);
+                    char_count += 1;
                     remain = t;
                 }
                 _ if next.is_ascii_digit() => {
                     let idx = split_digit(remain);
                     let (s1, s2) = remain.split_at(idx);
                     self.new_token(TokenKind::NUM, s1.to_string());
+                    char_count += idx;
                     remain = s2;
                 }
-                _ => panic!("Tokenizer error: invalid character {}", next),
+                _ => {
+                    eprintln!("{}", input);
+                    eprintln!(
+                        "{}^ Tokenizer error: invalid character {} (column {})",
+                        " ".repeat(char_count),
+                        next,
+                        char_count
+                    );
+                    panic!();
+                }
             }
+            eprintln!("{}", char_count);
         }
         self.new_token(TokenKind::EOF, '\0'.to_string());
     }
