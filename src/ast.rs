@@ -102,15 +102,29 @@ impl ASTBuilder {
     }
 
     fn mul(&mut self) -> Box<Option<Node<i64>>> {
-        let mut node = self.primary();
+        let mut node = self.unary();
         loop {
             if self.consume('*') {
-                node = Box::new(Some(Node::new(NodeKind::MUL, node, self.primary())));
+                node = Box::new(Some(Node::new(NodeKind::MUL, node, self.unary())));
             } else if self.consume('/') {
-                node = Box::new(Some(Node::new(NodeKind::DIV, node, self.primary())));
+                node = Box::new(Some(Node::new(NodeKind::DIV, node, self.unary())));
             } else {
                 return node;
             }
+        }
+    }
+
+    fn unary(&mut self) -> Box<Option<Node<i64>>> {
+        if self.consume('+') {
+            return self.primary();
+        } else if self.consume('-') {
+            return Box::new(Some(Node::new(
+                NodeKind::SUB,
+                Box::new(Some(Node::new_num(0))),
+                self.primary(),
+            )));
+        } else {
+            return self.primary();
         }
     }
 
@@ -120,7 +134,6 @@ impl ASTBuilder {
             self.expect(')');
             return node;
         }
-
         return Box::new(Some(Node::new_num(self.expect_number())));
     }
 
