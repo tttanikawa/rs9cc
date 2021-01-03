@@ -15,19 +15,28 @@ fn main() {
 
     let input = env::args().nth(1).unwrap();
 
-    println!(".intel_syntax noprefix");
-    println!(".globl main");
-    println!("main:");
-
     let tokenizer = Tokenizer::new();
     let tokens = tokenizer.tokenize(input);
     // dbg!(&tokens);
 
     let mut builder = ASTBuilder::new(tokens);
     let ast = builder.parse();
-    builder.gen(ast);
 
-    println!("  pop rax");
+    println!(".intel_syntax noprefix");
+    println!(".globl main");
+    println!("main:");
+
+    println!("  push rbp");
+    println!("  mov rbp, rsp");
+    println!("  sub rsp, 208");
+
+    for code in ast.into_iter() {
+        builder.gen(code);
+        println!("  pop rax");
+    }
+
+    println!("  mov rsp, rbp");
+    println!("  pop rbp");
     println!("  ret");
     return;
 }

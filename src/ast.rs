@@ -11,6 +11,8 @@ pub enum NodeKind {
     NE,
     LT,
     LE,
+    ASSIGN,
+    LVAR,
     NUM,
 }
 
@@ -20,10 +22,17 @@ pub struct Node<T> {
     pub lhs: Box<Option<Node<T>>>,
     pub rhs: Box<Option<Node<T>>>,
     pub val: Option<T>,
+    pub offset: Option<usize>,
 }
 
 pub struct ASTBuilder {
     pub tokens: VecDeque<Token>,
+    pub lvars: Vec<LVar>,
+}
+
+pub struct LVar {
+    name: String,
+    offset: usize,
 }
 
 impl<T> Node<T> {
@@ -33,6 +42,7 @@ impl<T> Node<T> {
             lhs,
             rhs,
             val: None,
+            offset: None,
         }
     }
 
@@ -42,13 +52,36 @@ impl<T> Node<T> {
             lhs: Box::new(None),
             rhs: Box::new(None),
             val: Some(val),
+            offset: None,
+        }
+    }
+
+    fn new_ident(offset: usize) -> Self {
+        Node::<T> {
+            kind: NodeKind::LVAR,
+            lhs: Box::new(None),
+            rhs: Box::new(None),
+            val: None,
+            offset: Some(offset),
         }
     }
 }
 
 impl ASTBuilder {
     pub fn new(tokens: VecDeque<Token>) -> Self {
-        ASTBuilder { tokens }
+        ASTBuilder {
+            tokens,
+            lvars: Vec::new(),
+        }
+    }
+
+    fn find_lvar(&self, tok: &Token) -> Option<&LVar> {
+        for lvar in &self.lvars {
+            if lvar.name == tok.string {
+                return Some(lvar);
+            }
+        }
+        None
     }
 
     fn consume(&mut self, op: &str) -> bool {
@@ -61,6 +94,16 @@ impl ASTBuilder {
         } else {
             panic!("ASTBuilder consume() error: tokens don't exist");
         }
+    }
+
+    fn consume_ident(&mut self) -> Option<Token> {
+        if let Some(token) = self.tokens.front() {
+            if token.kind != TokenKind::IDENT {
+                return None;
+            }
+            return Some(self.tokens.pop_front().unwrap());
+        }
+        None
     }
 
     fn expect(&mut self, op: &str) {
@@ -92,8 +135,30 @@ impl ASTBuilder {
         }
     }
 
+    fn program(&mut self) -> Vec<Box<Option<Node<i64>>>> {
+        let mut code = vec![];
+        while !self.at_eof() {
+            code.push(self.stmt());
+        }
+        code
+    }
+
+    fn stmt(&mut self) -> Box<Option<Node<i64>>> {
+        let node = self.expr();
+        self.expect(";");
+        node
+    }
+
     fn expr(&mut self) -> Box<Option<Node<i64>>> {
-        self.equality()
+        self.assign()
+    }
+
+    fn assign(&mut self) -> Box<Option<Node<i64>>> {
+        let mut node = self.equality();
+        if self.consume("=") {
+            node = Box::new(Some(Node::new(NodeKind::ASSIGN, node, self.assign())));
+        }
+        node
     }
 
     fn equality(&mut self) -> Box<Option<Node<i64>>> {
@@ -171,19 +236,65 @@ impl ASTBuilder {
             let node = self.expr();
             self.expect(")");
             return node;
+        } else if let Some(token) = self.consume_ident() {
+            if let Some(lvar) = self.find_lvar(&token) {
+                return Box::new(Some(Node::new_ident(lvar.offset)));
+            } else {
+                let offset = self.lvars.len() * 8;
+                self.lvars.push(LVar {
+                    name: token.string,
+                    offset,
+                });
+                return Box::new(Some(Node::new_ident(offset)));
+            }
+        } else {
+            return Box::new(Some(Node::new_num(self.expect_number())));
         }
-        return Box::new(Some(Node::new_num(self.expect_number())));
     }
 
-    pub fn parse(&mut self) -> Box<Option<Node<i64>>> {
-        self.expr()
+    pub fn parse(&mut self) -> Vec<Box<Option<Node<i64>>>> {
+        self.program()
+    }
+
+    fn gen_lval(&self, node: &Node<i64>) {
+        if node.kind != NodeKind::LVAR {
+            panic!("ASTBuilder gen_lval() error: not lval");
+        }
+        println!("  mov rax, rbp");
+        println!("  sub rax, {}", node.offset.unwrap());
+        println!("  push rax");
+    }
+
+    fn gen_lval_box(&self, node: Box<Option<Node<i64>>>) {
+        if let Some(node) = *node {
+            self.gen_lval(&node);
+        }
     }
 
     pub fn gen(&self, node: Box<Option<Node<i64>>>) {
         if let Some(node) = *node {
-            if node.kind == NodeKind::NUM {
-                println!("  push {}", node.val.unwrap());
-                return;
+            match node.kind {
+                NodeKind::NUM => {
+                    println!("  push {}", node.val.unwrap());
+                    return;
+                }
+                NodeKind::LVAR => {
+                    self.gen_lval(&node);
+                    println!("  pop rax");
+                    println!("  mov rax, [rax]");
+                    println!("  push rax");
+                    return;
+                }
+                NodeKind::ASSIGN => {
+                    self.gen_lval_box(node.lhs);
+                    self.gen(node.rhs);
+                    println!("  pop rdi");
+                    println!("  pop rax");
+                    println!("  mov [rax], rdi");
+                    println!("  push rdi");
+                    return;
+                }
+                _ => (),
             }
 
             self.gen(node.lhs);

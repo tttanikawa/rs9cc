@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 #[derive(PartialEq, Debug)]
 pub enum TokenKind {
     Reserved,
+    IDENT,
     NUM,
     EOF,
 }
@@ -56,14 +57,21 @@ impl Tokenizer {
                         char_count += remain.len() - t.len();
                         remain = t;
                     }
-                    '+' | '-' | '*' | '/' | '(' | ')' | '>' | '<' => {
+                    '+' | '-' | '*' | '/' | '(' | ')' | '>' | '<' | '=' | ';' => {
                         tokens.push_back(Token::new(TokenKind::Reserved, next.to_string()));
                         let (_, t) = remain.split_at(1);
                         char_count += 1;
                         remain = t;
                     }
-                    _ if next.is_ascii_digit() => {
-                        let idx = util::split_digit(remain);
+                    'a'..='z' => {
+                        let idx = util::split_alphabets(remain);
+                        let (s1, s2) = remain.split_at(idx);
+                        tokens.push_back(Token::new(TokenKind::IDENT, s1.to_string()));
+                        char_count += idx;
+                        remain = s2;
+                    }
+                    '0'..='9' => {
+                        let idx = util::split_digits(remain);
                         let (s1, s2) = remain.split_at(idx);
                         tokens.push_back(Token::new(TokenKind::NUM, s1.to_string()));
                         char_count += idx;
