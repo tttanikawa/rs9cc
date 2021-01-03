@@ -55,28 +55,28 @@ impl ASTBuilder {
             self.tokens.pop_front();
             return true;
         } else {
-            panic!("Tokenizer consume() error: tokens don't exist");
+            panic!("ASTBuilder consume() error: tokens don't exist");
         }
     }
 
     fn expect(&mut self, op: char) {
         if let Some(token) = self.tokens.pop_front() {
             if token.kind != TokenKind::Reserved || !token.string.starts_with(op) {
-                panic!("Tokenizer expect() error: not {}", op)
+                panic!("ASTBuilder expect() error: not {}", op)
             }
         } else {
-            panic!("Tokenizer expect() error: tokens don't exist");
+            panic!("ASTBuilder expect() error: tokens don't exist");
         }
     }
 
     fn expect_number(&mut self) -> i64 {
         if let Some(token) = self.tokens.pop_front() {
             if token.kind != TokenKind::NUM {
-                panic!("Tokenizer expect_number() error: not numbers");
+                panic!("ASTBuilder expect_number() error: not numbers");
             }
             return token.string.parse().unwrap();
         } else {
-            panic!("Tokenizer expect_number() error: tokens don't exist");
+            panic!("ASTBuilder expect_number() error: tokens don't exist");
         }
     }
 
