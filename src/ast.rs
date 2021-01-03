@@ -7,6 +7,10 @@ pub enum NodeKind {
     SUB,
     MUL,
     DIV,
+    EQ,
+    NE,
+    LT,
+    LE,
     NUM,
 }
 
@@ -47,9 +51,9 @@ impl ASTBuilder {
         ASTBuilder { tokens }
     }
 
-    fn consume(&mut self, op: char) -> bool {
+    fn consume(&mut self, op: &str) -> bool {
         if let Some(token) = self.tokens.front() {
-            if token.kind != TokenKind::Reserved || !token.string.starts_with(op) {
+            if token.kind != TokenKind::Reserved || token.string != op {
                 return false;
             }
             self.tokens.pop_front();
@@ -59,9 +63,9 @@ impl ASTBuilder {
         }
     }
 
-    fn expect(&mut self, op: char) {
+    fn expect(&mut self, op: &str) {
         if let Some(token) = self.tokens.pop_front() {
-            if token.kind != TokenKind::Reserved || !token.string.starts_with(op) {
+            if token.kind != TokenKind::Reserved || token.string != op {
                 panic!("ASTBuilder expect() error: not {}", op)
             }
         } else {
@@ -89,11 +93,45 @@ impl ASTBuilder {
     }
 
     fn expr(&mut self) -> Box<Option<Node<i64>>> {
+        self.equality()
+    }
+
+    fn equality(&mut self) -> Box<Option<Node<i64>>> {
+        let mut node = self.relational();
+        loop {
+            if self.consume("==") {
+                node = Box::new(Some(Node::new(NodeKind::EQ, node, self.relational())));
+            } else if self.consume("!=") {
+                node = Box::new(Some(Node::new(NodeKind::NE, node, self.relational())));
+            } else {
+                return node;
+            }
+        }
+    }
+
+    fn relational(&mut self) -> Box<Option<Node<i64>>> {
+        let mut node = self.add();
+        loop {
+            if self.consume("<") {
+                node = Box::new(Some(Node::new(NodeKind::LT, node, self.add())));
+            } else if self.consume("<=") {
+                node = Box::new(Some(Node::new(NodeKind::LE, node, self.add())));
+            } else if self.consume(">") {
+                node = Box::new(Some(Node::new(NodeKind::LT, self.add(), node)));
+            } else if self.consume(">=") {
+                node = Box::new(Some(Node::new(NodeKind::LE, self.add(), node)));
+            } else {
+                return node;
+            }
+        }
+    }
+
+    fn add(&mut self) -> Box<Option<Node<i64>>> {
         let mut node = self.mul();
         loop {
-            if self.consume('+') {
+            if self.consume("+") {
                 node = Box::new(Some(Node::new(NodeKind::ADD, node, self.mul())));
-            } else if self.consume('-') {
+            } else if self.consume("-") {
                 node = Box::new(Some(Node::new(NodeKind::SUB, node, self.mul())));
             } else {
                 return node;
@@ -104,9 +142,9 @@ impl ASTBuilder {
     fn mul(&mut self) -> Box<Option<Node<i64>>> {
         let mut node = self.unary();
         loop {
-            if self.consume('*') {
+            if self.consume("*") {
                 node = Box::new(Some(Node::new(NodeKind::MUL, node, self.unary())));
-            } else if self.consume('/') {
+            } else if self.consume("/") {
                 node = Box::new(Some(Node::new(NodeKind::DIV, node, self.unary())));
             } else {
                 return node;
@@ -115,13 +153,13 @@ impl ASTBuilder {
     }
 
     fn unary(&mut self) -> Box<Option<Node<i64>>> {
-        if self.consume('+') {
-            return self.primary();
-        } else if self.consume('-') {
+        if self.consume("+") {
+            return self.unary();
+        } else if self.consume("-") {
             return Box::new(Some(Node::new(
                 NodeKind::SUB,
                 Box::new(Some(Node::new_num(0))),
-                self.primary(),
+                self.unary(),
             )));
         } else {
             return self.primary();
@@ -129,9 +167,9 @@ impl ASTBuilder {
     }
 
     fn primary(&mut self) -> Box<Option<Node<i64>>> {
-        if self.consume('(') {
+        if self.consume("(") {
             let node = self.expr();
-            self.expect(')');
+            self.expect(")");
             return node;
         }
         return Box::new(Some(Node::new_num(self.expect_number())));
@@ -161,6 +199,26 @@ impl ASTBuilder {
                 NodeKind::DIV => {
                     println!("  cqo");
                     println!("  idiv rdi");
+                }
+                NodeKind::EQ => {
+                    println!("  cmp rax, rdi");
+                    println!("  sete al");
+                    println!("  movzb rax, al");
+                }
+                NodeKind::NE => {
+                    println!("  cmp rax, rdi");
+                    println!("  setne al");
+                    println!("  movzb rax, al");
+                }
+                NodeKind::LT => {
+                    println!("  cmp rax, rdi");
+                    println!("  setl al");
+                    println!("  movzb rax, al");
+                }
+                NodeKind::LE => {
+                    println!("  cmp rax, rdi");
+                    println!("  setle al");
+                    println!("  movzb rax, al");
                 }
                 _ => panic!("Invalid node kind: {:?}", node.kind),
             }
