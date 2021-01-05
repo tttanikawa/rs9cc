@@ -49,8 +49,17 @@ cd examples
 # assert 1 '1>=1'
 # assert 0 '1>=2'
 
-assert 4 'foo = 1; bar = foo + 3;'
-assert 10 'a1x = 3; b3 = 5 * 6 - 8; c_ = 4; return a1x + b3 / 2 -c_;'
+assert 4 '
+foo = 1;
+bar = foo + 3;
+'
+
+assert 10 '
+a1x = 3;
+b3 = 5 * 6 - 8;
+c_ = 4;
+return a1x + b3 / 2 -c_;'
+
 cd ..
 
 echo OK

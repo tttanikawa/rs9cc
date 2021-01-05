@@ -13,7 +13,8 @@ fn main() {
         return;
     }
 
-    let input = env::args().nth(1).unwrap();
+    let mut input = env::args().nth(1).unwrap().replace("\r\n", "\n");
+    input.retain(|c| c != '\n');
 
     let tokenizer = Tokenizer::new();
     let tokens = tokenizer.tokenize(input);
