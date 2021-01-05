@@ -6,6 +6,7 @@ pub enum TokenKind {
     Reserved,
     IDENT,
     NUM,
+    RETURN,
     EOF,
 }
 
@@ -64,9 +65,13 @@ impl Tokenizer {
                         remain = t;
                     }
                     'a'..='z' => {
-                        let idx = util::split_alphabets(remain);
+                        let idx = util::split_var_names(remain);
                         let (s1, s2) = remain.split_at(idx);
-                        tokens.push_back(Token::new(TokenKind::IDENT, s1.to_string()));
+                        if s1 == "return" {
+                            tokens.push_back(Token::new(TokenKind::RETURN, s1.to_string()));
+                        } else {
+                            tokens.push_back(Token::new(TokenKind::IDENT, s1.to_string()));
+                        }
                         char_count += idx;
                         remain = s2;
                     }

@@ -13,6 +13,7 @@ pub enum NodeKind {
     LE,
     ASSIGN,
     LVAR,
+    RETURN,
     NUM,
 }
 
@@ -106,6 +107,16 @@ impl ASTBuilder {
         None
     }
 
+    fn consume_return(&mut self) -> Option<Token> {
+        if let Some(token) = self.tokens.front() {
+            if token.kind != TokenKind::RETURN {
+                return None;
+            }
+            return Some(self.tokens.pop_front().unwrap());
+        }
+        None
+    }
+
     fn expect(&mut self, op: &str) {
         if let Some(token) = self.tokens.pop_front() {
             if token.kind != TokenKind::Reserved || token.string != op {
@@ -144,8 +155,19 @@ impl ASTBuilder {
     }
 
     fn stmt(&mut self) -> Box<Option<Node<i64>>> {
-        let node = self.expr();
-        self.expect(";");
+        let node = if let Some(_) = self.consume_return() {
+            Box::new(Some(Node::new(
+                NodeKind::RETURN,
+                self.expr(),
+                Box::new(None),
+            )))
+        } else {
+            self.expr()
+        };
+
+        if !self.consume(";") {
+            panic!("ASTBuilder stmt() error: no ;");
+        }
         node
     }
 
@@ -292,6 +314,14 @@ impl ASTBuilder {
                     println!("  pop rax");
                     println!("  mov [rax], rdi");
                     println!("  push rdi");
+                    return;
+                }
+                NodeKind::RETURN => {
+                    self.gen(node.lhs);
+                    println!("  pop rax");
+                    println!("  mov rsp, rbp");
+                    println!("  pop rbp");
+                    println!("  ret");
                     return;
                 }
                 _ => (),
